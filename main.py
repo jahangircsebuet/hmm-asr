@@ -17,8 +17,8 @@ import os
 #     break
     # print(os.path.join(dirname, filename))
 
-path = '/data'
-data_path = path
+path = 'data'
+data_path = path + '/data'
 print(path, data_path)
 
 
@@ -124,39 +124,50 @@ def data_reader(read='train', dump_pickle=False, max_len=None):
     p_bar = tqdm(range(100))
     c = -1
 
+    num = 0
+    # start of data and max_ generation
     for i, j in afd.iterrows():
-        c += 1
-        afp = file_path + j[f_Path]  # audio file path
-        pfn = j['filename'].split('.WAV')[0] + '.PHN'
+        if num < 2:
+            num = num + 1
+            c += 1
+            afp = file_path + j[f_Path]  # audio file path
+            pfn = j['filename'].split('.WAV')[0] + '.PHN'
 
-        p_bar.set_description(f'Working on {j["filename"]} ,index: {c}  ')
-        try:
-            pfp = file_path + pfd[(pfd['filename'] == pfn) & (pfd['speaker_id'] == j['speaker_id'])][f_Path].values[0]
-        except:
-            pfp = afp.replace(j['filename'], pfn)
+            p_bar.set_description(f'Working on {j["filename"]} ,index: {c}  ')
+            try:
+                pfp = file_path + pfd[(pfd['filename'] == pfn) & (pfd['speaker_id'] == j['speaker_id'])][f_Path].values[0]
+            except:
+                pfp = afp.replace(j['filename'], pfn)
 
-        ph_ = pd.read_csv(pfp, sep=" ")
-        ph_.columns = ['start', 'end', 'phoneme']
-        # audio,sr = librosa.load(afp,sr=None)
-        sr, audio = wavfile.read(afp)
+            # print(pfp)
+            ph_ = pd.read_csv(pfp, sep=" ")
+            # assign column name
+            ph_.columns = ['start', 'end', 'phoneme']
+            # audio,sr = librosa.load(afp,sr=None)
+            sr, audio = wavfile.read(afp)
 
-        # all of the data didn't fit in the main memory so trying different solution
-        for k, l in ph_.iterrows():
-            label = get39EquiOf61(removePhonStressMarker(l['phoneme']))
-            if label not in data:
-                data[label] = []
-            data[label].append(audio[l['start']:l['end']])
-            if (label not in max_):
-                max_[label] = 0
-            else:
-                s = l['end'] - l['start']
-                max_[label] = sr if s > sr else s if max_[label] < s else max_[label]
+            # all of the data didn't fit in the main memory so trying different solution
+            for k, l in ph_.iterrows():
+                # what is difference between 39 and 61
+                label = get39EquiOf61(removePhonStressMarker(l['phoneme']))
+                if label not in data:
+                    data[label] = []
+                data[label].append(audio[l['start']:l['end']])
+                if (label not in max_):
+                    max_[label] = 0
+                else:
+                    s = l['end'] - l['start']
+                    max_[label] = sr if s > sr else s if max_[label] < s else max_[label]
+
+    # end of data and max_ generation
 
     if (max_len is not None):
         max_ = max_len
 
+    # iterate over data
     for key, dat in data.items():
         dt = np.zeros((len(dat), max_[key]))
+        print(dt.shape)
         for i in range(dt.shape[0]):
             try:
                 dt[i][:data[key][i].shape[0]] = data[key][i]
@@ -167,6 +178,7 @@ def data_reader(read='train', dump_pickle=False, max_len=None):
             label.append(label_p39[get39EquiOf61(removePhonStressMarker(l['phoneme']))])
             data.append(audio[l['start']:l['end']])
         '''
+    print(data)
     p_bar.close()
     if (dump_pickle and False):
         output_path = '/output/train_data.pickle' if read == 'train' else '/output/test_data.pickle'
@@ -300,6 +312,8 @@ def test_all_models(models, test_data):
 predictions = {}
 for key in test_data:
     predictions[key] = testModel(key, models, test_data[key], max_)
+
+
 
 
 
